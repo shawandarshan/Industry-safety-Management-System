@@ -51,3 +51,19 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+# --- Worker Schemas ---
+class WorkerBase(BaseModel):
+    name: str
+    department: str
+    role: str
+    email: str
+    phone: str
+
+class WorkerCreate(WorkerBase):
+    pass
+
+class Worker(WorkerBase):
+    id: int
+    class Config:
+        orm_mode = True

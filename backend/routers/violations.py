@@ -44,9 +44,11 @@ def get_dashboard_stats(db: Session = Depends(database.get_db)):
     total = db.query(models.Violation).count()
     unresolved = db.query(models.Violation).filter(models.Violation.status == "unresolved").count()
     resolved = db.query(models.Violation).filter(models.Violation.status == "resolved").count()
+    cameras = db.query(models.Camera).count()
     
     return {
         "total_violations": total,
         "unresolved_violations": unresolved,
-        "resolved_violations": resolved
+        "resolved_violations": resolved,
+        "total_cameras": cameras
     }

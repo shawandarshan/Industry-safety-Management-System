@@ -58,6 +58,13 @@ export default function LiveCamera() {
     return () => clearInterval(interval);
   }, [isTesting]);
 
+  // Ensure camera is stopped when component unmounts
+  useEffect(() => {
+    return () => {
+      fetch("http://localhost:8000/camera/stop", { method: "POST" }).catch(e => console.error(e));
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
@@ -66,7 +73,7 @@ export default function LiveCamera() {
           <p className="text-gray-500 mt-1">Real-time AI monitoring of the factory floor.</p>
         </div>
         <div className="flex space-x-2">
-          <select className="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white shadow-sm focus:ring-blue-500 focus:border-blue-500">
+          <select className="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none hover:border-blue-400 cursor-pointer transition-colors">
             <option>All Zones</option>
             <option>Assembly Line A</option>
             <option>Loading Dock</option>
@@ -82,7 +89,7 @@ export default function LiveCamera() {
             {/* Modal Header */}
             <div className="p-4 border-b flex justify-between items-center bg-gray-900 text-white">
               <h3 className="font-semibold flex items-center text-lg">
-                <Camera size={20} className="mr-2 text-blue-400" /> AI Safety Monitor - Live Test
+                <Camera size={20} className="mr-2 text-blue-400" /> SafetyHub Monitor - Live Test
               </h3>
               <button 
                 onClick={handleStopTest}

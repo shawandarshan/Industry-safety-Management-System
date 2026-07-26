@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 
 class PPEDetector:
-    def __init__(self, model_path="yolov8n.pt"): # Using a base model for demonstration
+    def __init__(self, model_path="yolo11s.pt"): # Using a base model for demonstration
         # In a real scenario, this would be a YOLO model trained on a PPE dataset
         # with classes like: 0: Person, 1: Helmet, 2: Vest, 3: Mask, 4: Gloves, 5: Shoes
         self.model = YOLO(model_path)

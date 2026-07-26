@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 
 # Load YOLO model
-model = YOLO("yolov8n.pt")
+model = YOLO("yolo11s.pt")
 
 # Open laptop camera
 cap = cv2.VideoCapture(0)

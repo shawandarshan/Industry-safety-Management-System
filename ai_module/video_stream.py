@@ -31,7 +31,7 @@ def send_alert(missing_ppe, image_path):
 
 def main(source):
     cap = cv2.VideoCapture(source)
-    detector = PPEDetector("yolov8n.pt") # Ensure ultralytics downloads this or use your custom .pt
+    detector = PPEDetector("yolo11s.pt") # Ensure ultralytics downloads this or use your custom .pt
     
     # To prevent spamming alerts for the same person, we can implement a cooldown
     last_alert_time = 0
@@ -72,7 +72,7 @@ def main(source):
                 send_alert(violation["missing"], image_path)
                 last_alert_time = current_time
 
-        cv2.imshow("AI Safety Monitor", frame)
+        cv2.imshow("SafetyHub Monitor", frame)
         
         # Press 'q' to quit
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -82,7 +82,7 @@ def main(source):
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="AI Safety Video Stream")
+    parser = argparse.ArgumentParser(description="SafetyHub Video Stream")
     parser.add_argument("--source", default=0, help="Video source: 0 for webcam, or path to video file")
     args = parser.parse_args()
     

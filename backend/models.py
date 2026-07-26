@@ -33,3 +33,13 @@ class Violation(Base):
     status = Column(String, default="unresolved") # unresolved, resolved
 
     camera = relationship("Camera", back_populates="violations")
+
+class Worker(Base):
+    __tablename__ = "workers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    department = Column(String)
+    role = Column(String)
+    email = Column(String, unique=True, index=True)
+    phone = Column(String)

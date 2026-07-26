@@ -19,15 +19,20 @@
     "autoprefixer": "^10.5.2",
     "axios": "^1.18.1",
     "chart.js": "^4.5.1",
+    "file-saver": "^2.0.5",
     "firebase": "^12.16.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.24.0",
+    "papaparse": "^5.5.4",
     "postcss": "^8.5.19",
     "react": "^19.2.7",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
     "tailwindcss": "^4.3.2",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

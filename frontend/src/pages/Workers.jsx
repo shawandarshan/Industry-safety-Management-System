@@ -8,6 +8,7 @@ import { subscribeToWorkers, addWorker, updateWorker, deleteWorker } from '../se
 import AddWorkerModal from '../components/AddWorkerModal';
 import EditWorkerModal from '../components/EditWorkerModal';
 import DeleteDialog from '../components/DeleteDialog';
+import WorkerProfileModal from '../components/WorkerProfileModal';
 
 export default function Workers() {
   const [workers, setWorkers] = useState([]);
@@ -18,6 +19,7 @@ export default function Workers() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -115,6 +117,11 @@ export default function Workers() {
   const openDeleteModal = (worker) => {
     setSelectedWorker(worker);
     setIsDeleteModalOpen(true);
+  };
+
+  const openProfileModal = (worker) => {
+    setSelectedWorker(worker);
+    setIsProfileModalOpen(true);
   };
 
   // Filtering
@@ -314,7 +321,7 @@ export default function Workers() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors">
+                        <button onClick={() => openProfileModal(worker)} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors">
                           <Eye size={16} />
                         </button>
                         <button onClick={() => openEditModal(worker)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-700 rounded transition-colors">
@@ -351,6 +358,12 @@ export default function Workers() {
         onClose={() => { setIsDeleteModalOpen(false); setSelectedWorker(null); }} 
         onConfirm={handleDeleteWorker} 
         workerName={selectedWorker?.name} 
+      />
+
+      <WorkerProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => { setIsProfileModalOpen(false); setSelectedWorker(null); }}
+        worker={selectedWorker}
       />
 
       {/* Toast Notification */}

@@ -3,6 +3,20 @@ from sqlalchemy.orm import Session
 from typing import List
 
 import models, schemas, database
+from pydantic import BaseModel
+import time
+from utils.cloudinary_client import upload_base64_image
+from utils.firebase_client import get_firestore_db
+import datetime
+
+class AIEventCreate(BaseModel):
+    timestamp: float
+    missing: str
+    score: int
+    image: str
+    camera_id: str = "Camera-1"
+    worker_id: str = "Unknown"
+    worker_name: str = "Unknown"
 
 router = APIRouter(
     prefix="/violations",
@@ -19,6 +33,38 @@ def create_violation(violation: schemas.ViolationCreate, db: Session = Depends(d
     db.commit()
     db.refresh(db_violation)
     return db_violation
+
+@router.post("/ai-event")
+def create_ai_event(event: AIEventCreate):
+    """
+    Endpoint for the AI Edge module to push a new violation event with an image.
+    Uploads to Cloudinary, then saves to Firestore.
+    """
+    image_url = None
+    if event.image:
+        image_url = upload_base64_image(event.image)
+        
+    db = get_firestore_db()
+    if not db:
+        raise HTTPException(status_code=500, detail="Firestore not initialized")
+        
+    doc_ref = db.collection("violations").document()
+    
+    violation_data = {
+        "id": doc_ref.id,
+        "cameraId": event.camera_id,
+        "workerId": event.worker_id,
+        "workerName": event.worker_name,
+        "violationType": event.missing,
+        "confidence": event.score,
+        "imageUrl": image_url,
+        "status": "unresolved",
+        "timestamp": datetime.datetime.fromtimestamp(event.timestamp)
+    }
+    
+    doc_ref.set(violation_data)
+    
+    return {"message": "Event recorded", "id": doc_ref.id, "url": image_url}
 
 @router.get("/", response_model=List[schemas.Violation])
 def read_violations(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):

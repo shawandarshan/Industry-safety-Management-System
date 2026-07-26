@@ -10,6 +10,30 @@ import Login from './pages/Login';
 import Reports from './pages/Reports';
 import Sidebar from './components/Sidebar';
 import TopNav from './components/TopNav';
+import { subscribeToNewViolations } from './services/violationService';
+import { useEffect } from 'react';
+
+const NotificationManager = () => {
+  useEffect(() => {
+    // Request permission on mount
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+
+    const unsubscribe = subscribeToNewViolations((violation) => {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const missingText = Array.isArray(violation.missing_ppe) ? violation.missing_ppe.join(', ') : violation.missing_ppe;
+        new Notification('🚨 Safety Violation Detected', {
+          body: `Missing PPE: ${missingText} at Camera ${violation.camera_id || 'Unknown'}`,
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  return null;
+};
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -28,6 +52,7 @@ function App() {
         
         <Route path="/*" element={
           <ProtectedRoute>
+            <NotificationManager />
             <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
               <Sidebar />
               <div className="flex-1 flex flex-col min-w-0">

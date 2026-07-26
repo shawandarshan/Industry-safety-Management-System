@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import { 
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title as ChartTitle, Tooltip, Legend, ArcElement, PointElement, LineElement
 } from 'chart.js';
@@ -7,6 +6,8 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import { ShieldAlert, CheckCircle, Video, Activity, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import DigitalTwin from '../components/DigitalTwin';
 import { Link } from 'react-router-dom';
+import { subscribeToViolations, resolveViolation } from '../services/violationService';
+import { subscribeToCameras } from '../services/cameraService';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ChartTitle, Tooltip, Legend, ArcElement);
 
@@ -15,8 +16,9 @@ export default function Dashboard() {
     total_violations: 0,
     unresolved_violations: 0,
     resolved_violations: 0,
-    current_risk_score: 45,
-    total_cameras: 4
+    current_risk_score: 0,
+    total_cameras: 0,
+    active_cameras: 0
   });
 
   const [workers, setWorkers] = useState([
@@ -26,39 +28,60 @@ export default function Dashboard() {
   ]);
 
   const [recentViolations, setRecentViolations] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await axios.get('http://localhost:8000/violations/stats', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        setStats(prev => ({ ...prev, ...response.data }));
-      } catch (err) {
-        console.error("Failed to fetch stats", err);
-      }
-    };
-    
-    const fetchRecent = async () => {
-      try {
-        const response = await axios.get('http://localhost:8000/violations/');
-        // take first 5
-        setRecentViolations(response.data.slice(0, 5));
-      } catch (err) {
-        console.error("Failed to fetch recent violations", err);
-      }
-    };
+    let unsubscribeViolations;
+    let unsubscribeCameras;
 
-    fetchStats();
-    fetchRecent();
+    try {
+      unsubscribeViolations = subscribeToViolations((violationsData) => {
+        setRecentViolations(violationsData);
+        
+        const unresolved = violationsData.filter(v => v.status === 'unresolved').length;
+        const resolved = violationsData.filter(v => v.status === 'resolved').length;
+        
+        // Calculate a simple risk score based on unresolved violations
+        const riskScore = Math.min(100, unresolved * 15 + 10);
+        
+        setStats(prev => ({
+          ...prev,
+          total_violations: violationsData.length,
+          unresolved_violations: unresolved,
+          resolved_violations: resolved,
+          current_risk_score: riskScore
+        }));
+      });
+
+      unsubscribeCameras = subscribeToCameras((camerasData) => {
+        const active = camerasData.filter(c => c.status === 'Online').length;
+        setStats(prev => ({
+          ...prev,
+          total_cameras: camerasData.length,
+          active_cameras: active
+        }));
+        setLoading(false);
+      });
+    } catch (err) {
+      console.error("Failed to subscribe to data", err);
+      setLoading(false);
+    }
+
+    return () => {
+      if (unsubscribeViolations) unsubscribeViolations();
+      if (unsubscribeCameras) unsubscribeCameras();
+    };
   }, []);
 
-  // Use mock if empty
-  const displayViolations = recentViolations.length > 0 ? recentViolations : [
-    { id: 101, camera_id: 2, timestamp: "2026-07-13T10:30:00Z", missing_ppe: "Helmet", status: "unresolved" },
-    { id: 102, camera_id: 1, timestamp: "2026-07-13T09:15:00Z", missing_ppe: "Mask, Gloves", status: "resolved" },
-    { id: 103, camera_id: 3, timestamp: "2026-07-13T08:00:00Z", missing_ppe: "Safety Vest", status: "unresolved" }
-  ];
+  const handleResolve = async (id) => {
+    try {
+      await resolveViolation(id);
+    } catch (error) {
+      console.error("Failed to resolve violation", error);
+    }
+  };
+
+  const displayViolations = recentViolations.slice(0, 5);
 
   const barData = {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -167,7 +190,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-[14px] text-slate-400 font-medium">Active Cameras</p>
-              <h3 className="text-[32px] font-bold text-white leading-none mt-1">{stats.total_cameras}<span className="text-lg text-slate-500 font-normal">/4</span></h3>
+              <h3 className="text-[32px] font-bold text-white leading-none mt-1">{stats.active_cameras}<span className="text-lg text-slate-500 font-normal">/{stats.total_cameras}</span></h3>
             </div>
           </div>
         </CardWrap>
@@ -196,27 +219,20 @@ export default function Dashboard() {
               </h2>
             </div>
             <div className="space-y-4">
-              <div className="flex gap-3 items-start p-3 bg-red-500/10 rounded-xl border border-red-500/20">
-                <ShieldAlert size={18} className="text-red-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[14px] text-white font-medium">Missing Helmet Detected</p>
-                  <p className="text-xs text-slate-400 mt-1">Cam-02 Loading Dock • 2 mins ago</p>
+              {recentViolations.slice(0, 3).map((v) => (
+                <div key={v.id} className="flex gap-3 items-start p-3 bg-red-500/10 rounded-xl border border-red-500/20">
+                  <ShieldAlert size={18} className="text-red-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[14px] text-white font-medium capitalize">{v.missing_ppe.join(', ')} Detected</p>
+                    <p className="text-xs text-slate-400 mt-1">Camera {v.camera_name || v.camera_id} • {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-3 items-start p-3 bg-slate-700/30 rounded-xl border border-white/5 hover:bg-slate-700/50 transition-colors cursor-pointer">
-                <Activity size={18} className="text-blue-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[14px] text-white font-medium">New Worker Registered</p>
-                  <p className="text-xs text-slate-400 mt-1">Zone A • 15 mins ago</p>
+              ))}
+              {recentViolations.length === 0 && (
+                <div className="text-sm text-slate-400 p-3 text-center bg-slate-800 rounded-xl border border-white/5">
+                  No recent alerts to display.
                 </div>
-              </div>
-              <div className="flex gap-3 items-start p-3 bg-slate-700/30 rounded-xl border border-white/5 hover:bg-slate-700/50 transition-colors cursor-pointer">
-                <Clock size={18} className="text-amber-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[14px] text-white font-medium">System Update Scheduled</p>
-                  <p className="text-xs text-slate-400 mt-1">Today • 11:00 PM</p>
-                </div>
-              </div>
+              )}
             </div>
           </CardWrap>
 
@@ -311,8 +327,8 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-                        {v.missing_ppe}
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 capitalize">
+                        {Array.isArray(v.missing_ppe) ? v.missing_ppe.join(', ') : v.missing_ppe}
                       </span>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
@@ -334,7 +350,7 @@ export default function Dashboard() {
                     </td>
                     <td className="py-4 px-4 text-right whitespace-nowrap">
                       {v.status === 'unresolved' ? (
-                        <button className="text-[16px] text-white bg-blue-600 hover:bg-blue-500 font-medium px-4 py-2 rounded-lg transition-colors shadow-lg shadow-blue-500/20">
+                        <button onClick={() => handleResolve(v.id)} className="text-[16px] text-white bg-blue-600 hover:bg-blue-500 font-medium px-4 py-2 rounded-lg transition-colors shadow-lg shadow-blue-500/20">
                           Resolve
                         </button>
                       ) : (

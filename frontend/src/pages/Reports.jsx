@@ -18,6 +18,11 @@ import {
 } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import { subscribeToWorkers } from '../services/workerService';
+import { subscribeToViolations } from '../services/violationService';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -26,11 +31,12 @@ ChartJS.register(
 
 export default function Reports() {
   const [workers, setWorkers] = useState([]);
+  const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('This Week');
 
   useEffect(() => {
-    const unsubscribe = subscribeToWorkers(
+    const unsubscribeWorkers = subscribeToWorkers(
       (data) => {
         setWorkers(data);
         setLoading(false);
@@ -40,15 +46,41 @@ export default function Reports() {
         setLoading(false);
       }
     );
-    return () => unsubscribe();
+
+    const unsubscribeViolations = subscribeToViolations(
+      (data) => setViolations(data),
+      (error) => console.error("Error fetching violations:", error)
+    );
+
+    return () => {
+      unsubscribeWorkers();
+      unsubscribeViolations();
+    };
   }, []);
 
   // Compute KPIs
   const totalWorkers = workers.length;
-  const totalViolations = workers.reduce((acc, w) => acc + (Number(w.violations) || 0), 0);
+  const totalViolations = violations.length; // Use actual violations count
   const avgSafetyScore = workers.length 
     ? Math.round(workers.reduce((acc, w) => acc + (Number(w.safetyScore) || 0), 0) / workers.length)
     : 0;
+
+  // Trend data grouping
+  const weeklyTrend = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    violations.forEach(v => {
+      if(v.timestamp) {
+        // Firebase timestamp is a date string or object, convert safely
+        const d = new Date(v.timestamp?.seconds ? v.timestamp.seconds * 1000 : v.timestamp);
+        if (!isNaN(d)) counts[d.getDay()] += 1;
+      }
+    });
+    // Shift array to start from Monday for typical business week view
+    const shiftedLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const shiftedCounts = [counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[0]];
+    return { labels: shiftedLabels, counts: shiftedCounts };
+  }, [violations]);
 
   // Top 5 Workers with most violations
   const topViolators = [...workers]
@@ -102,19 +134,51 @@ export default function Reports() {
     ]
   };
 
-  // Mock trend data since we don't store historical timeline yet
   const lineChartData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: weeklyTrend.labels,
     datasets: [
       {
         label: 'Daily Violations',
-        data: [4, 6, 3, 7, 2, 0, 1],
+        data: weeklyTrend.counts,
         fill: true,
         borderColor: 'rgba(239, 68, 68, 1)',
         backgroundColor: 'rgba(239, 68, 68, 0.1)',
         tension: 0.4,
       }
     ]
+  };
+
+  // Export Functions
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(workers);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'safety_report.csv';
+    link.click();
+  };
+
+  const handleExportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(workers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Workers");
+    XLSX.writeFile(wb, "safety_report.xlsx");
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Industry Safety Management - Report", 14, 15);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 25);
+    
+    const tableData = workers.map(w => [w.employeeId, w.name, w.department, w.role, w.safetyScore, w.violations]);
+    
+    doc.autoTable({
+      startY: 35,
+      head: [['ID', 'Name', 'Department', 'Role', 'Safety Score', 'Violations']],
+      body: tableData,
+    });
+    
+    doc.save("safety_report.pdf");
   };
 
   const chartOptions = {
@@ -172,9 +236,9 @@ export default function Reports() {
             Filter
           </button>
           <div className="flex rounded-lg overflow-hidden border border-white/10">
-            <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium text-white border-r border-white/10 transition-colors">CSV</button>
-            <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium text-white border-r border-white/10 transition-colors">Excel</button>
-            <button className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-sm font-medium text-white transition-colors">
+            <button onClick={handleExportCSV} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium text-white border-r border-white/10 transition-colors">CSV</button>
+            <button onClick={handleExportExcel} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium text-white border-r border-white/10 transition-colors">Excel</button>
+            <button onClick={handleExportPDF} className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-sm font-medium text-white transition-colors">
               <Download size={16} className="mr-2" /> PDF
             </button>
           </div>

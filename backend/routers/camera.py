@@ -1,6 +1,7 @@
 import subprocess
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+import requests
 
 router = APIRouter(
     prefix="/camera",
@@ -49,3 +50,18 @@ def stop_camera():
         
     camera_process = None
     return {"message": "Camera stopped", "status": "stopped"}
+
+@router.post("/process-frame")
+async def process_frame(request: Request):
+    """
+    Proxies the frame data from the frontend (Laptop/USB cameras) 
+    to the AI Edge module running on port 8001 for YOLO processing.
+    """
+    try:
+        body = await request.json()
+        response = requests.post("http://localhost:8001/process_frame", json=body, timeout=5)
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=503, detail=f"AI stream server is down: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

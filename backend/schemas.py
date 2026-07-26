@@ -13,7 +13,7 @@ class User(UserBase):
     id: int
     role: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Camera Schemas ---
 class CameraBase(BaseModel):
@@ -27,7 +27,7 @@ class Camera(CameraBase):
     id: int
     status: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Violation Schemas ---
 class ViolationBase(BaseModel):
@@ -43,7 +43,7 @@ class Violation(ViolationBase):
     timestamp: datetime
     status: str
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
@@ -66,4 +66,4 @@ class WorkerCreate(WorkerBase):
 class Worker(WorkerBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
